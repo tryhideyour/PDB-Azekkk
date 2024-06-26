@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from flask_mysqldb import MySQL
 import MySQLdb.cursors
+from werkzeug.security import generate_password_hash
 import re
 import os
 import sys
@@ -144,29 +145,36 @@ def logout():
     session.pop('email', None)
     return redirect(url_for('login'))
   
-@app.route('/register', methods =['GET', 'POST'])
+@app.route('/register', methods=['GET', 'POST'])
 def register():
     mesage = ''
-    if request.method == 'POST' and 'name' in request.form and 'password' in request.form and 'email' in request.form :
-        userName = request.form['name']
+    if request.method == 'POST' and 'first_name' in request.form and 'last_name' in request.form and 'password' in request.form and 'email' in request.form:
+        first_name = request.form['first_name']
+        last_name = request.form['last_name']
         password = request.form['password']
         email = request.form['email']
+        role = request.form.get('role', 'user')  # default role to 'user' if not provided
+
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM user WHERE email = % s', (email, ))
+        cursor.execute('SELECT * FROM user WHERE email = %s', (email,))
         account = cursor.fetchone()
+        
         if account:
-            mesage = 'Account already exists !'
+            mesage = 'Account already exists!'
         elif not re.match(r'[^@]+@[^@]+\.[^@]+', email):
-            mesage = 'Invalid email address !'
-        elif not userName or not password or not email:
-            mesage = 'Please fill out the form !'
+            mesage = 'Invalid email address!'
+        elif not first_name or not last_name or not password or not email:
+            mesage = 'Please fill out the form!'
         else:
-            cursor.execute('INSERT INTO user VALUES (NULL, % s, % s, % s)', (userName, email, password, ))
+            # Hash password before saving to database
+            cursor.execute('INSERT INTO user (first_name, last_name, email, password, role) VALUES (%s, %s, %s, %s, %s)', (first_name, last_name, email, password, role))
             mysql.connection.commit()
-            mesage = 'You have successfully registered !'
+            mesage = 'You have successfully registered!'
+            return redirect(url_for('login'))
     elif request.method == 'POST':
-        mesage = 'Please fill out the form !'
-    return render_template('register.html', mesage = mesage)
+        mesage = 'Please fill out the form!'
+    return render_template('register.html', mesage=mesage)
+
 
 # Manage Books   
 @app.route("/books", methods =['GET', 'POST'])
@@ -548,6 +556,6 @@ def delete_rack():
     return redirect(url_for('login'))
     
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
     os.execv(__file__, sys.argv)
 
